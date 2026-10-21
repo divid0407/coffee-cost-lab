@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>杯杯有数 · Coffee Cost Lab</title>
+<meta name="description" content="咖啡馆饮品成本核算工具：原料库、配方成本、定价建议、保本测算。纯前端单页应用，数据只存在本地。">
+<style>
+  :root {
+    --espresso: #3e2723;
+    --mocha: #6d4c41;
+    --caramel: #c08a3e;
+    --cream: #f7f1e8;
+    --milk: #fffdf9;
+    --latte: #e8dccb;
+    --accent: #a05c2c;
+    --accent-soft: #f3e2c7;
+    --green: #5b7f5c;
+    --red: #c0564f;
+    --text: #33261f;
+    --muted: #8a7a6e;
+    --radius: 14px;
+    --shadow: 0 4px 18px rgba(62, 39, 35, .08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--espresso) 0%, var(--mocha) 60%, var(--caramel) 130%);
+    color: var(--milk);
+    padding: 42px 20px 60px;
+    text-align: center;
+  }
+  header h1 { font-size: 2rem; letter-spacing: 4px; }
+  header p { opacity: .82; margin-top: 8px; font-size: .95rem; }
+  header .cup { font-size: 2.4rem; display: block; margin-bottom: 6px; }
+  main { max-width: 920px; margin: -34px auto 60px; padding: 0 16px; }
+  .card {
+    background: var(--milk);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 26px 26px 30px;
+    margin-bottom: 26px;
+    border: 1px solid #efe6d8;
+  }
+  .card h2 {
+    font-size: 1.15rem; color: var(--espresso); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::before { content: ""; width: 5px; height: 20px; border-radius: 3px; background: var(--caramel); }
+  .card h3 { font-size: 1rem; color: var(--mocha); margin: 22px 0 10px; }
+  .hint { font-size: .85rem; color: var(--muted); margin-bottom: 16px; }
+  .field-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+  .field label { font-size: .82rem; color: var(--muted); }
+  select, input[type="number"], input[type="text"] {
+    padding: 9px 12px; border: 1px solid var(--latte); border-radius: 9px;
+    font-size: .92rem; background: #fff; color: var(--text); outline: none;
+    transition: border-color .15s; width: 100%;
+  }
+  select:focus, input:focus { border-color: var(--caramel); }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; padding: 12px 28px;
+    border-radius: 10px; font-size: 1rem; cursor: pointer; letter-spacing: 1px;
+    transition: transform .12s, background .15s;
+  }
+  button.primary:hover { background: #8a4f24; transform: translateY(-1px); }
+  button.ghost {
+    background: transparent; color: var(--accent); border: 1px solid var(--caramel);
+    padding: 8px 18px; border-radius: 9px; font-size: .88rem; cursor: pointer;
+  }
+  button.ghost:hover { background: var(--accent-soft); }
+  button.ghost.danger { color: var(--red); border-color: #d9a49f; }
+  button.ghost.danger:hover { background: #fbeeee; }
+  button.ghost.active { background: var(--espresso); color: #fff; border-color: var(--espresso); }
+  button.mini {
+    border: none; background: none; color: var(--red); cursor: pointer; font-size: .82rem;
+    padding: 2px 6px;
+  }
+  button.mini.edit { color: var(--accent); }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: 6px; }
+  table.data-table th {
+    text-align: left; font-size: .8rem; color: var(--muted); font-weight: 600;
+    padding: 8px 8px; border-bottom: 2px solid var(--latte); white-space: nowrap;
+  }
+  table.data-table td { padding: 9px 8px; border-bottom: 1px dashed var(--latte); }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.data-table tr.total td { border-bottom: none; border-top: 2px solid var(--latte); font-weight: 700; color: var(--espresso); }
+  .tag {
+    background: var(--accent-soft); color: var(--accent); font-size: .76rem;
+    padding: 3px 11px; border-radius: 999px; white-space: nowrap;
+  }
+  .tag.green { background: #e5eee5; color: var(--green); }
+  .tag.red { background: #fbe9e7; color: var(--red); }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat {
+    background: #fbf6ee; border: 1px solid var(--latte); border-radius: 10px; padding: 12px 14px;
+  }
+  .stat b { display: block; font-size: 1.3rem; color: var(--espresso); font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .78rem; color: var(--muted); }
+  .stat.highlight { background: var(--espresso); border-color: var(--espresso); }
+  .stat.highlight b, .stat.highlight span { color: #fff; }
+  .tip-box {
+    margin-top: 16px; background: #fdf8ef; border-left: 3px solid var(--caramel);
+    border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: .85rem; color: var(--mocha);
+  }
+  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .ing-row select { flex: 2; min-width: 140px; }
+  .ing-row input { flex: 1; min-width: 90px; }
+  .ing-row .unit-label { font-size: .85rem; color: var(--muted); min-width: 24px; }
+  .empty { color: var(--muted); font-size: .88rem; text-align: center; padding: 14px 0; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 20px 0 40px; }
+  footer a { color: var(--accent); }
+  .fade-in { animation: fade .35s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="cup">🧮</span>
+  <h1>杯杯有数</h1>
+  <p>Coffee Cost Lab · 咖啡馆饮品成本核算工具</p>
+</header>
+
+<main>
+  <!-- 原料库 -->
+  <section class="card">
+    <h2>原料库</h2>
+    <p class="hint">先录入原料的规格和进货价，工具会自动算出单位成本。下方示例价格仅供演示，请按你的实际进货价修改。数据只保存在本机浏览器，不上传。</p>
+    <div class="field-row">
+      <div class="field"><label>原料名称</label><input type="text" id="ing-name" placeholder="如：拼配咖啡豆"></div>
+      <div class="field"><label>规格数量</label><input type="number" id="ing-qty" placeholder="1000" min="0.01" step="any"></div>
+      <div class="field"><label>规格单位</label>
+        <select id="ing-unit">
+          <option value="g">克 (g)</option>
+          <option value="ml">毫升 (ml)</option>
+          <option value="个">个</option>
+        </select>
+      </div>
+      <div class="field"><label>进货价 (元)</label><input type="number" id="ing-price" placeholder="160" min="0" step="any"></div>
+    </div>
+    <div class="btn-row">
+      <button class="primary" onclick="addIngredient()">➕ 添加原料</button>
+      <button class="ghost" onclick="fillPresets()">一键填入常用原料（示例）</button>
+    </div>
+    <table class="data-table">
+      <thead><tr>
+        <th>原料</th><th class="num">规格</th><th class="num">进货价</th>
+        <th class="num">单位成本</th><th class="num">操作</th>
+      </tr></thead>
+      <tbody id="ing-tbody"></tbody>
+    </table>
+  </section>
+
+  <!-- 饮品配方 -->
+  <section class="card">
+    <h2>饮品配方</h2>
+    <p class="hint">给每杯饮品列出原料用量，自动算出单杯原料成本。</p>
+    <div class="btn-row" id="drink-tabs"></div>
+    <div id="drink-editor"></div>
+  </section>
+
+  <!-- 菜单总览 -->
+  <section class="card">
+    <h2>菜单总览</h2>
+    <p class="hint">所有饮品的成本与毛利一览，帮你一眼看出哪款最赚钱、哪款在亏本边缘。</p>
+    <table class="data-table">
+      <thead><tr>
+        <th>饮品</th><th class="num">售价</th><th class="num">原料成本</th>
+        <th class="num">成本率</th><th class="num">单杯毛利</th><th class="num">毛利率</th>
+      </tr></thead>
+      <tbody id="overview-tbody"></tbody>
+    </table>
+    <div class="stat-grid" id="overview-stats"></div>
+  </section>
+
+  <!-- 定价与保本 -->
+  <section class="card">
+    <h2>定价建议与保本测算</h2>
+    <h3>定价建议</h3>
+    <p class="hint">设定目标毛利率，工具按"售价 = 成本 ÷ (1 − 毛利率)"反推建议售价。</p>
+    <div class="field-row">
+      <div class="field" style="max-width:220px"><label>目标毛利率 (%)</label>
+        <input type="number" id="target-margin" value="70" min="1" max="95" step="1" oninput="onMarginInput()">
+      </div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>饮品</th><th class="num">原料成本</th><th class="num">当前售价</th><th class="num">建议售价</th></tr></thead>
+      <tbody id="pricing-tbody"></tbody>
+    </table>
+    <h3>保本测算</h3>
+    <p class="hint">填月固定成本，算出每天要卖多少杯才能保本（按菜单平均单杯毛利）。</p>
+    <div class="field-row">
+      <div class="field"><label>房租 / 月 (元)</label><input type="number" id="fix-rent" min="0" step="any" oninput="onFixedInput()"></div>
+      <div class="field"><label>人工 / 月 (元)</label><input type="number" id="fix-labor" min="0" step="any" oninput="onFixedInput()"></div>
+      <div class="field"><label>水电杂费 / 月 (元)</label><input type="number" id="fix-util" min="0" step="any" oninput="onFixedInput()"></div>
+      <div class="field"><label>其他 / 月 (元)</label><input type="number" id="fix-other" min="0" step="any" oninput="onFixedInput()"></div>
+    </div>
+    <div class="stat-grid" id="breakeven-stats"></div>
+    <div class="tip-box">💡 保本杯数 = 日均固定成本 ÷ 平均单杯毛利。这里是简化模型：没考虑外卖抽成、损耗和不同饮品销量权重，适合快速估算，不适合做财报。</div>
+  </section>
+</main>
+
+<footer>🧮 Coffee Cost Lab · 杯杯有数 —— 开源项目，欢迎 Star / 提 Issue<br>
+<a href="https://github.com/divid0407/coffee-cost-lab">GitHub</a> · MIT License</footer>
+
+<script>
+/* ================= 数据与状态 ================= */
+const LS_KEY = "ccl-data-v1";
+const UNITS = { g: "g", ml: "ml", "个": "个" };
+
+const PRESET_INGREDIENTS = [
+  { name: "拼配咖啡豆", unit: "g", specQty: 1000, price: 160 },
+  { name: "牛奶", unit: "ml", specQty: 1000, price: 12 },
+  { name: "燕麦奶", unit: "ml", specQty: 1000, price: 18 },
+  { name: "糖浆", unit: "ml", specQty: 750, price: 45 },
+  { name: "冰块", unit: "g", specQty: 1000, price: 5 },
+  { name: "纸杯", unit: "个", specQty: 1000, price: 350 },
+  { name: "杯盖", unit: "个", specQty: 1000, price: 120 },
+  { name: "吸管", unit: "个", specQty: 1000, price: 80 }
+];
+
+let state = null;       // { ingredients, drinks, fixed, targetMargin }
+let activeDrinkId = null;
+
+const $ = id => document.getElementById(id);
+const uid = () => "id" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+const money = n => "¥" + (Math.round(n * 100) / 100).toFixed(2);
+const pct = n => (Math.round(n * 1000) / 10).toFixed(1) + "%";
+
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) { state = JSON.parse(raw); return; }
+  } catch (e) { /* 忽略损坏数据，走种子数据 */ }
+  seed();
+}
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* 忽略 */ }
+}
+function seed() {
+  const ings = PRESET_INGREDIENTS.map(p => ({ id: uid(), ...p }));
+  const byName = n => ings.find(i => i.name === n).id;
+  state = {
+    ingredients: ings,
+    drinks: [
+      {
+        id: uid(), name: "拿铁 360ml", price: 22,
+        items: [
+          { ingId: byName("拼配咖啡豆"), amount: 18 },
+          { ingId: byName("牛奶"), amount: 200 },
+          { ingId: byName("纸杯"), amount: 1 },
+          { ingId: byName("杯盖"), amount: 1 },
+          { ingId: byName("吸管"), amount: 1 }
+        ]
+      },
+      {
+        id: uid(), name: "美式 360ml", price: 18,
+        items: [
+          { ingId: byName("拼配咖啡豆"), amount: 18 },
+          { ingId: byName("纸杯"), amount: 1 },
+          { ingId: byName("杯盖"), amount: 1 },
+          { ingId: byName("吸管"), amount: 1 }
+        ]
+      }
+    ],
+    fixed: { rent: 8000, labor: 12000, util: 1500, other: 1000 },
+    targetMargin: 70
+  };
+  activeDrinkId = state.drinks[0].id;
+  save();
+}
+
+/* ================= 纯计算逻辑 ================= */
+function unitCost(ing) {
+  if (!ing || !(ing.specQty > 0)) return 0;
+  return ing.price / ing.specQty;
+}
+function findIng(id) { return state.ingredients.find(i => i.id === id); }
+function drinkCost(drink) {
+  return drink.items.reduce((sum, it) => {
+    const ing = findIng(it.ingId);
+    if (!ing || !(it.amount > 0)) return sum;
+    return sum + it.amount * unitCost(ing);
+  }, 0);
+}
+function drinkMargin(drink) {
+  const cost = drinkCost(drink);
+  if (!(drink.price > 0)) return 0;
+  return (drink.price - cost) / drink.price;
+}
+function suggestedPrice(drink, targetMarginPct) {
+  const m = targetMarginPct / 100;
+  if (m <= 0 || m >= 1) return 0;
+  return drinkCost(drink) / (1 - m);
+}
+function monthlyFixed() {
+  const f = state.fixed;
+  return (f.rent || 0) + (f.labor || 0) + (f.util || 0) + (f.other || 0);
+}
+function avgMarginPerCup() {
+  if (!state.drinks.length) return 0;
+  const total = state.drinks.reduce((s, d) => s + (d.price - drinkCost(d)), 0);
+  return total / state.drinks.length;
+}
+
+/* ================= 原料库 ================= */
+function addIngredient() {
+  const name = $("ing-name").value.trim();
+  const qty = parseFloat($("ing-qty").value);
+  const unit = $("ing-unit").value;
+  const price = parseFloat($("ing-price").value);
+  if (!name) { alert("请填写原料名称"); return; }
+  if (!(qty > 0)) { alert("规格数量必须大于 0"); return; }
+  if (!(price >= 0)) { alert("进货价不能为负数"); return; }
+  state.ingredients.push({ id: uid(), name, unit, specQty: qty, price });
+  $("ing-name").value = ""; $("ing-qty").value = ""; $("ing-price").value = "";
+  save(); renderAll();
+}
+function delIngredient(id) {
+  if (!confirm("删除该原料？引用它的配方用量会一并移除。")) return;
+  state.ingredients = state.ingredients.filter(i => i.id !== id);
+  state.drinks.forEach(d => { d.items = d.items.filter(it => it.ingId !== id); });
+  save(); renderAll();
+}
+function fillPresets() {
+  const names = new Set(state.ingredients.map(i => i.name));
+  PRESET_INGREDIENTS.forEach(p => {
+    if (!names.has(p.name)) state.ingredients.push({ id: uid(), ...p });
+  });
+  save(); renderAll();
+}
+function renderIngredients() {
+  const tb = $("ing-tbody");
+  if (!state.ingredients.length) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty">还没有原料，先添加或一键填入常用原料吧</div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = state.ingredients.map(i => `
+    <tr>
+      <td>${esc(i.name)}</td>
+      <td class="num">${i.specQty}${UNITS[i.unit] || i.unit}</td>
+      <td class="num">${money(i.price)}</td>
+      <td class="num">${money(unitCost(i))}/${UNITS[i.unit] || i.unit}</td>
+      <td class="num"><button class="mini" onclick="delIngredient('${i.id}')">删除</button></td>
+    </tr>`).join("");
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ================= 饮品配方 ================= */
+function activeDrink() {
+  return state.drinks.find(d => d.id === activeDrinkId) || state.drinks[0] || null;
+}
+function addDrink() {
+  const d = { id: uid(), name: "新饮品", price: 20, items: [] };
+  state.drinks.push(d);
+  activeDrinkId = d.id;
+  save(); renderAll();
+}
+function delDrink() {
+  const d = activeDrink();
+  if (!d) return;
+  if (!confirm(`删除饮品「${d.name}」？`)) return;
+  state.drinks = state.drinks.filter(x => x.id !== d.id);
+  activeDrinkId = state.drinks.length ? state.drinks[0].id : null;
+  save(); renderAll();
+}
+function selectDrink(id) { activeDrinkId = id; renderAll(); }
+function onDrinkField(field, value) {
+  const d = activeDrink(); if (!d) return;
+  if (field === "name") d.name = value;
+  if (field === "price") d.price = parseFloat(value) || 0;
+  save(); renderOverview(); renderPricing();
+}
+function addDrinkRow() {
+  const d = activeDrink(); if (!d || !state.ingredients.length) return;
+  d.items.push({ ingId: state.ingredients[0].id, amount: 0 });
+  save(); renderDrinks();
+}
+function onRowIng(rowIdx, ingId) {
+  const d = activeDrink(); if (!d) return;
+  d.items[rowIdx].ingId = ingId;
+  save(); renderDrinks(); renderOverview(); renderPricing();
+}
+function onRowAmount(rowIdx, amount) {
+  const d = activeDrink(); if (!d) return;
+  d.items[rowIdx].amount = parseFloat(amount) || 0;
+  save(); renderDrinks(); renderOverview(); renderPricing();
+}
+function delDrinkRow(rowIdx) {
+  const d = activeDrink(); if (!d) return;
+  d.items.splice(rowIdx, 1);
+  save(); renderAll();
+}
+function renderDrinks() {
+  const tabs = $("drink-tabs");
+  tabs.innerHTML = state.drinks.map(d =>
+    `<button class="ghost ${d.id === activeDrinkId ? "active" : ""}" onclick="selectDrink('${d.id}')">${esc(d.name)}</button>`
+  ).join("") || `<span class="empty">还没有饮品，点"新增饮品"开始</span>`;
+
+  const ed = $("drink-editor");
+  const d = activeDrink();
+  if (!d) { ed.innerHTML = ""; return; }
+  const cost = drinkCost(d);
+  const margin = drinkMargin(d);
+  const ingOptions = selId => state.ingredients.map(i =>
+    `<option value="${i.id}" ${i.id === selId ? "selected" : ""}>${esc(i.name)}（${money(unitCost(i))}/${UNITS[i.unit] || i.unit}）</option>`
+  ).join("");
+  ed.innerHTML = `
+    <div class="field-row">
+      <div class="field"><label>饮品名称</label>
+        <input type="text" value="${esc(d.name)}" oninput="onDrinkField('name', this.value)"></div>
+      <div class="field" style="max-width:200px"><label>售价 (元)</label>
+        <input type="number" value="${d.price}" min="0" step="any" oninput="onDrinkField('price', this.value)"></div>
+    </div>
+    ${d.items.map((it, idx) => {
+      const ing = findIng(it.ingId);
+      const unit = ing ? (UNITS[ing.unit] || ing.unit) : "";
+      return `<div class="ing-row">
+        <select onchange="onRowIng(${idx}, this.value)">${ingOptions(it.ingId)}</select>
+        <input type="number" value="${it.amount}" min="0" step="any" placeholder="用量" oninput="onRowAmount(${idx}, this.value)">
+        <span class="unit-label">${unit}</span>
+        <button class="mini" onclick="delDrinkRow(${idx})">删除</button>
+      </div>`;
+    }).join("")}
+    <div class="btn-row" style="margin-top:10px">
+      <button class="ghost" onclick="addDrinkRow()">➕ 添加原料用量</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><b>${money(cost)}</b><span>单杯原料成本</span></div>
+      <div class="stat"><b>${pct(margin)}</b><span>毛利率</span></div>
+      <div class="stat"><b>${money(d.price - cost)}</b><span>单杯毛利</span></div>
+    </div>`;
+}
+
+/* ================= 菜单总览 ================= */
+function renderOverview() {
+  const tb = $("overview-tbody");
+  if (!state.drinks.length) {
+    tb.innerHTML = `<tr><td colspan="6"><div class="empty">还没有饮品</div></td></tr>`;
+    $("overview-stats").innerHTML = "";
+    return;
+  }
+  tb.innerHTML = state.drinks.map(d => {
+    const cost = drinkCost(d);
+    const margin = drinkMargin(d);
+    const rate = d.price > 0 ? cost / d.price : 0;
+    const tag = margin < 0.5 ? `<span class="tag red">偏低</span>`
+      : margin >= 0.7 ? `<span class="tag green">健康</span>` : "";
+    return `<tr>
+      <td>${esc(d.name)}</td>
+      <td class="num">${money(d.price)}</td>
+      <td class="num">${money(cost)}</td>
+      <td class="num">${pct(rate)}</td>
+      <td class="num">${money(d.price - cost)}</td>
+      <td class="num">${pct(margin)} ${tag}</td>
+    </tr>`;
+  }).join("");
+  const costs = state.drinks.map(drinkCost);
+  const avgCost = costs.reduce((a, b) => a + b, 0) / costs.length;
+  const margins = state.drinks.map(drinkMargin);
+  const avgMargin = margins.reduce((a, b) => a + b, 0) / margins.length;
+  $("overview-stats").innerHTML = `
+    <div class="stat"><b>${state.drinks.length}</b><span>饮品数量</span></div>
+    <div class="stat"><b>${money(avgCost)}</b><span>平均单杯成本</span></div>
+    <div class="stat"><b>${pct(avgMargin)}</b><span>平均毛利率</span></div>`;
+}
+
+/* ================= 定价与保本 ================= */
+function onMarginInput() {
+  const v = parseFloat($("target-margin").value);
+  state.targetMargin = (v >= 1 && v <= 95) ? v : 70;
+  save(); renderPricing();
+}
+function onFixedInput() {
+  state.fixed = {
+    rent: parseFloat($("fix-rent").value) || 0,
+    labor: parseFloat($("fix-labor").value) || 0,
+    util: parseFloat($("fix-util").value) || 0,
+    other: parseFloat($("fix-other").value) || 0
+  };
+  save(); renderBreakeven();
+}
+function renderPricing() {
+  const tb = $("pricing-tbody");
+  const m = state.targetMargin;
+  $("target-margin").value = m;
+  tb.innerHTML = state.drinks.length ? state.drinks.map(d => {
+    const sug = suggestedPrice(d, m);
+    const diff = sug - d.price;
+    const hint = diff > 0.5 ? `<span class="tag">可涨 ${money(diff)}</span>`
+      : diff < -0.5 ? `<span class="tag green">已超预期</span>` : "";
+    return `<tr>
+      <td>${esc(d.name)}</td>
+      <td class="num">${money(drinkCost(d))}</td>
+      <td class="num">${money(d.price)}</td>
+      <td class="num">${money(sug)} ${hint}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="4"><div class="empty">还没有饮品</div></td></tr>`;
+}
+function renderBreakeven() {
+  const f = state.fixed;
+  $("fix-rent").value = f.rent || "";
+  $("fix-labor").value = f.labor || "";
+  $("fix-util").value = f.util || "";
+  $("fix-other").value = f.other || "";
+  const monthly = monthlyFixed();
+  const daily = monthly / 30;
+  const avg = avgMarginPerCup();
+  const cups = avg > 0 ? Math.ceil(daily / avg) : 0;
+  $("breakeven-stats").innerHTML = `
+    <div class="stat"><b>${money(monthly)}</b><span>月固定成本</span></div>
+    <div class="stat"><b>${money(daily)}</b><span>日均固定成本</span></div>
+    <div class="stat"><b>${money(avg)}</b><span>平均单杯毛利</span></div>
+    <div class="stat highlight"><b>${cups} 杯</b><span>日保本杯数</span></div>`;
+}
+
+/* ================= 渲染入口 ================= */
+function renderAll() {
+  renderIngredients();
+  renderDrinks();
+  renderOverview();
+  renderPricing();
+  renderBreakeven();
+}
+
+load();
+if (!state.drinks.find(d => d.id === activeDrinkId)) {
+  activeDrinkId = state.drinks.length ? state.drinks[0].id : null;
+}
+renderAll();
+</script>
+</body>
+</html>
